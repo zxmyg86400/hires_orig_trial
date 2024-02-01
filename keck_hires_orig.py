@@ -61,7 +61,7 @@ class KECKHIRESORIGSpectrograph(spectrograph.Spectrograph):
         """
         par = super().default_pypeit_par()
 
-        par['rdx']['detnum'] = [(1,2,3)]
+        par['rdx']['detnum'] = [(1)]
 
         # Adjustments to parameters for Keck HIRES
         turn_on = dict(use_biasimage=False, use_overscan=True, overscan_method='median',
