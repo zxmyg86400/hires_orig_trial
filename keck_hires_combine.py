@@ -204,9 +204,6 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
         self.meta['filter1'] = dict(ext=0, card='FIL1NAME')
         self.meta['echangle'] = dict(ext=0, card='ECHANGL', rtol=1e-3)
         self.meta['xdangle'] = dict(ext=0, card='XDANGL', rtol=1e-3)
-#        self.meta['idname'] = dict(ext=0, card='IMAGETYP')
-        # NOTE: This is the native keyword.  IMAGETYP is from KOA.
-        self.meta['idname'] = dict(ext=0, card='OBSTYPE')
         self.meta['frameno'] = dict(ext=0, card='FRAMENO')
         self.meta['instrument'] = dict(ext=0, card='INSTRUME')
 
@@ -377,6 +374,18 @@ class KeckHIRESUpdatedSpectrograph(KECKHIRESSpectrograph):
     name = 'keck_hires_updated'
     ndet = 3
 
+
+    def init_meta(self):
+        """
+        Define how metadata are derived from the spectrograph files.
+
+        That is, this associates the PypeIt-specific metadata keywords
+        with the instrument-specific header cards using :attr:`meta`.
+        """
+        super().init_meta()
+#        self.meta['idname'] = dict(ext=0, card='IMAGETYP')
+        # NOTE: This is the native keyword.  IMAGETYP is from KOA.
+        self.meta['idname'] = dict(ext=0, card='OBSTYPE')
 
     @classmethod
     def default_pypeit_par(cls):
@@ -681,6 +690,18 @@ class KeckHIRESOrigSpectrograph(KECKHIRESSpectrograph):
 
     name = 'keck_hires_orig'
     ndet = 1
+
+
+    def init_meta(self):
+        """
+        Define how metadata are derived from the spectrograph files.
+
+        That is, this associates the PypeIt-specific metadata keywords
+        with the instrument-specific header cards using :attr:`meta`.
+        """
+        super().init_meta()
+        self.meta['idname'] = dict(ext=0, card='IMAGETYP')
+        # NOTE: This is the native keyword.  IMAGETYP is from KOA.
 
 
     @classmethod
