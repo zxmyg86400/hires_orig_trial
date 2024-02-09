@@ -743,7 +743,7 @@ class KeckHIRESOrigSpectrograph(KECKHIRESSpectrograph):
             binning         = binning,
             det             = 1,
             dataext         = 0,
-            specaxis        = 0,
+            specaxis        = 1,
             specflip        = False,
             spatflip        = False,
             platescale      = 0.135,
