@@ -691,6 +691,8 @@ class KeckHIRESOrigSpectrograph(KECKHIRESSpectrograph):
     name = 'keck_hires_orig'
     ndet = 1
 
+    header_name = 'HIRES Spectrograph'
+
 
     def init_meta(self):
         """
@@ -716,6 +718,8 @@ class KeckHIRESOrigSpectrograph(KECKHIRESSpectrograph):
         par = super().default_pypeit_par()
 
         par['rdx']['detnum'] = [(1)]
+
+        par['calibrations']['wavelengths']['ech_separate_2d'] = False
 
         return par
 
