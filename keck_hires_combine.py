@@ -12,7 +12,6 @@ from IPython import embed
 import numpy as np
 from scipy.io import readsav
 
-
 from astropy.table import Table
 from astropy import time
 
@@ -37,10 +36,12 @@ class HIRESMosaicLookUp:
     # Original
     geometry = {
         'MSC01': {'default_shape': (6168, 3990),
-                  'blue_det': {'shift': (-2048.0 - 41.0, 0.0), 'rotation': 0.},
+                  'blue_det': {'shift': (-2048.0 - 41.0, -3.), 'rotation': 0.},
                   'green_det': {'shift': (0., 0.), 'rotation': 0.},
                   'red_det': {'shift': (2048.0 + 53.0, 0.), 'rotation': 0.}},
     }
+    # adding -3 to the blue_det shift in the y-direction helps to deal with the gap
+    # in the 2D fit wavelength solution between the blue and green detectors
 
 
 class KECKHIRESSpectrograph(spectrograph.Spectrograph):
@@ -77,6 +78,8 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
         """
         par = super().default_pypeit_par()
 
+        par['rdx']['detnum'] = [(1,2,3)]
+
         # Adjustments to parameters for Keck HIRES
         turn_on = dict(use_biasimage=False, use_overscan=True, overscan_method='median',
                        use_darkimage=False, use_illumflat=False, use_pixelflat=False,
@@ -106,6 +109,10 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
         par['calibrations']['slitedges']['overlap'] = True
         par['calibrations']['slitedges']['dlength_range'] = 0.25
 
+#        par['calibrations']['slitedges']['add_missed_orders'] = True   ### yaqi
+        par['calibrations']['slitedges']['order_width_poly'] = 2
+        par['calibrations']['slitedges']['order_gap_poly'] = 3
+
         # These are the defaults
         par['calibrations']['tilts']['tracethresh'] = 15
         par['calibrations']['tilts']['spat_order'] = 3
@@ -113,26 +120,26 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
 
         # 1D wavelength solution
         par['calibrations']['wavelengths']['lamps'] = ['ThAr']
-        # This is for 1x1 binning. TODO GET BINNING SORTED OUT!!
-        par['calibrations']['wavelengths']['rms_threshold'] = 0.50
-        par['calibrations']['wavelengths']['sigdetect'] = 5.0
-        par['calibrations']['wavelengths']['n_final'] = 4 #[3] + 13 * [4] + [3]
-        # This is for 1x1 binning. Needs to be divided by binning for binned data!!
-        par['calibrations']['wavelengths']['fwhm'] = 8.0
+        par['calibrations']['wavelengths']['rms_thresh_frac_fwhm'] = 0.1
+        par['calibrations']['wavelengths']['sigdetect'] = 5.
+        par['calibrations']['wavelengths']['n_first'] = 3
+        par['calibrations']['wavelengths']['n_final'] = 4
+
+        par['calibrations']['wavelengths']['match_toler'] = 1.5
         # Reidentification parameters
         par['calibrations']['wavelengths']['method'] = 'echelle'
-        # TODO: the arxived solution is for 1x1 binning. It needs to be
-        # generalized for different binning!
-        #par['calibrations']['wavelengths']['reid_arxiv'] = 'vlt_xshooter_vis1x1.fits'
-        par['calibrations']['wavelengths']['cc_thresh'] = 0.50
-        par['calibrations']['wavelengths']['cc_local_thresh'] = 0.50
-#        par['calibrations']['wavelengths']['ech_fix_format'] = True
+        par['calibrations']['wavelengths']['cc_shift_range'] = (-80.,80.)
+        par['calibrations']['wavelengths']['cc_thresh'] = 0.6
+        par['calibrations']['wavelengths']['cc_local_thresh'] = 0.25
+        par['calibrations']['wavelengths']['reid_cont_sub'] = False
+
         # Echelle parameters
         par['calibrations']['wavelengths']['echelle'] = True
-        par['calibrations']['wavelengths']['ech_nspec_coeff'] = 4
-        par['calibrations']['wavelengths']['ech_norder_coeff'] = 4
-        par['calibrations']['wavelengths']['ech_sigrej'] = 3.0
+        par['calibrations']['wavelengths']['ech_nspec_coeff'] = 5
+        par['calibrations']['wavelengths']['ech_norder_coeff'] = 3
+        par['calibrations']['wavelengths']['ech_sigrej'] = 2.0
         par['calibrations']['wavelengths']['ech_separate_2d'] = True
+        par['calibrations']['wavelengths']['bad_orders_maxfrac'] = 0.5
 
         # Flats
         par['calibrations']['flatfield']['tweak_slits_thresh'] = 0.90
@@ -150,11 +157,53 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
         # Sensitivity function parameters
         par['sensfunc']['algorithm'] = 'IR'
         par['sensfunc']['polyorder'] = 5 #[9, 11, 11, 9, 9, 8, 8, 7, 7, 7, 7, 7, 7, 7, 7]
-        par['sensfunc']['IR']['telgridfile'] = 'TelFit_MaunaKea_3100_26100_R20000.fits'
+        par['sensfunc']['IR']['telgridfile'] = 'TellPCA_3000_10500_R120000.fits'
+        par['sensfunc']['IR']['pix_shift_bounds'] = (-40.0,40.0)
+        
+        # Telluric parameters
+        # HIRES is usually oversampled, so the helio shift can be large
+        par['telluric']['pix_shift_bounds'] = (-40.0,40.0)
+        # Similarly, the resolution guess is higher than it should be
+        par['telluric']['resln_frac_bounds'] = (0.25,1.25)
 
         # Coadding
         par['coadd1d']['wave_method'] = 'log10'
 
+        return par
+
+    def config_specific_par(self, scifile, inp_par=None):
+        """
+        Modify the PypeIt parameters to hard-wired values used for
+        specific instrument configurations.
+
+        Args:
+            scifile (:obj:`str`):
+                File to use when determining the configuration and how
+                to adjust the input parameters.
+            inp_par (:class:`~pypeit.par.parset.ParSet`, optional):
+                Parameter set used for the full run of PypeIt.  If None,
+                use :func:`default_pypeit_par`.
+
+        Returns:
+            :class:`~pypeit.par.parset.ParSet`: The PypeIt parameter set
+            adjusted for configuration specific parameter values.
+        """
+        par = super().config_specific_par(scifile, inp_par=inp_par)
+
+        headarr = self.get_headarr(scifile)
+
+        bin_spec, bin_spat = parse.parse_binning(self.get_meta_value(headarr, 'binning'))
+
+        # slit edges
+        # NOTE: With add_missed_orders set to True and order_spat_range set to the
+        # default (None), the code will try to add missing orders over the full
+        # range of the detector mosaic!
+        par['calibrations']['slitedges']['order_spat_range'] = [10., 6200./bin_spat]
+
+        # wavelength
+        par['calibrations']['wavelengths']['fwhm'] = 8.0/bin_spec
+
+        # Return
         return par
 
 
@@ -176,7 +225,6 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
             msgs.error('This is not the correct spectrograph. Use keck_hires_orig instead.')
         elif _dateobs > date_orig and self.name in ['keck_hires_orig']:
             msgs.error('This is not the correct spectrograph. Use keck_hires_updated instead.')
-
 
 
     def init_meta(self):
@@ -203,13 +251,15 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
         self.meta['dispname'] = dict(ext=0, card='XDISPERS')
         self.meta['filter1'] = dict(ext=0, card='FIL1NAME')
         self.meta['echangle'] = dict(ext=0, card='ECHANGL', rtol=1e-3)
-        self.meta['xdangle'] = dict(ext=0, card='XDANGL', rtol=1e-3)
+        self.meta['xdangle'] = dict(ext=0, card='XDANGL', rtol=1e-2)
+#        self.meta['idname'] = dict(ext=0, card='IMAGETYP')
+        # NOTE: This is the native keyword.  IMAGETYP is from KOA.
+        self.meta['idname'] = dict(ext=0, card='OBSTYPE')
         self.meta['frameno'] = dict(ext=0, card='FRAMENO')
         self.meta['instrument'] = dict(ext=0, card='INSTRUME')
 
         # Extras for pypeit file
         self.meta['dateobs'] = dict(ext=0, card='DATE-OBS')
-
 
     def compound_meta(self, headarr, meta_key):
         """
@@ -324,8 +374,6 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
         return np.zeros(len(fitstbl), dtype=bool)
 
 
-    
-
     def get_echelle_angle_files(self):
         """ Pass back the files required
         to run the echelle method of wavecalib
@@ -363,9 +411,6 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
         return np.ones_like(order_vec)*det.platescale*binspatial
 
 
-
-
-
 class KeckHIRESUpdatedSpectrograph(KECKHIRESSpectrograph):
     """
     Child to handle the Keck/HIRES after 2004 update specific code
@@ -373,7 +418,6 @@ class KeckHIRESUpdatedSpectrograph(KECKHIRESSpectrograph):
 
     name = 'keck_hires_updated'
     ndet = 3
-
 
     def init_meta(self):
         """
@@ -387,6 +431,7 @@ class KeckHIRESUpdatedSpectrograph(KECKHIRESSpectrograph):
         # NOTE: This is the native keyword.  IMAGETYP is from KOA.
         self.meta['idname'] = dict(ext=0, card='OBSTYPE')
 
+
     @classmethod
     def default_pypeit_par(cls):
         """
@@ -399,6 +444,8 @@ class KeckHIRESUpdatedSpectrograph(KECKHIRESSpectrograph):
         par = super().default_pypeit_par()
 
         par['rdx']['detnum'] = [(1,2,3)]
+
+        par['calibrations']['slitedges']['add_missed_orders'] = True
 
         return par
 
@@ -681,8 +728,6 @@ class KeckHIRESUpdatedSpectrograph(KECKHIRESSpectrograph):
         return detector_container.DetectorContainer( **detector_dicts[det-1])
 
 
-
-
 class KeckHIRESOrigSpectrograph(KECKHIRESSpectrograph):
     """
     Child to handle the Keck/HIRES before 2004 update specific code
@@ -772,7 +817,7 @@ class KeckHIRESOrigSpectrograph(KECKHIRESSpectrograph):
 
 
 
-    def get_rawimage(self, raw_file, det, spectrim=20):
+    def get_rawimage(self, raw_file, det, spectrim=0):
         """ Read the image
         """
         # Check for file; allow for extra .gz, etc. suffix
@@ -809,7 +854,6 @@ class KeckHIRESOrigSpectrograph(KECKHIRESSpectrograph):
 
         return self.get_detector_par(1, hdu=hdu), \
                 full_image, hdu, head0['ELAPTIME'], rawdatasec_img, oscansec_img
-
 
 
 
