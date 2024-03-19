@@ -216,15 +216,15 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
 
         """
 
-        # check that we are using the right spectrograph (keck_lris_blue or keck_lris_blue_orig)
+        # check that we are using the right spectrograph
         _dateobs = time.Time(self.get_meta_value(filename, 'dateobs'), format='iso')
-        # last day of keck_lris_blue_orig
 
         date_orig = time.Time('2004-08-18', format='iso')
         if _dateobs <= date_orig and self.name in ['keck_hires_updated']:
             msgs.error('This is not the correct spectrograph. Use keck_hires_orig instead.')
         elif _dateobs > date_orig and self.name in ['keck_hires_orig']:
             msgs.error('This is not the correct spectrograph. Use keck_hires_updated instead.')
+
 
 
     def init_meta(self):
@@ -247,8 +247,8 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
         self.meta['airmass'] = dict(ext=0, card='AIRMASS')
         #self.meta['dispname'] = dict(ext=0, card='ECHNAME')
         # Extras for config and frametyping
-        self.meta['hatch'] = dict(ext=0, card='HATOPEN')
-        self.meta['dispname'] = dict(ext=0, card='XDISPERS')
+        self.meta['hatch'] = dict(ext=0, card='HATOPEN')  
+        self.meta['dispname'] = dict(ext=0, card='XDISPERS')              
         self.meta['filter1'] = dict(ext=0, card='FIL1NAME')
         self.meta['echangle'] = dict(ext=0, card='ECHANGL', rtol=1e-3)
         self.meta['xdangle'] = dict(ext=0, card='XDANGL', rtol=1e-2)
@@ -260,6 +260,9 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
 
         # Extras for pypeit file
         self.meta['dateobs'] = dict(ext=0, card='DATE-OBS')
+
+
+
 
     def compound_meta(self, headarr, meta_key):
         """
@@ -373,18 +376,6 @@ class KECKHIRESSpectrograph(spectrograph.Spectrograph):
         msgs.warn('Cannot determine if frames are of type {0}.'.format(ftype))
         return np.zeros(len(fitstbl), dtype=bool)
 
-
-    def get_echelle_angle_files(self):
-        """ Pass back the files required
-        to run the echelle method of wavecalib
-
-        Returns:
-            list: List of files
-        """
-        angle_fits_file = 'keck_hires_angle_fits.fits'
-        composite_arc_file = 'keck_hires_composite_arc.fits'
-
-        return [angle_fits_file, composite_arc_file]
         
 
     def order_platescale(self, order_vec, binning=None):
@@ -448,6 +439,19 @@ class KeckHIRESUpdatedSpectrograph(KECKHIRESSpectrograph):
         par['calibrations']['slitedges']['add_missed_orders'] = True
 
         return par
+
+
+    def get_echelle_angle_files(self):
+        """ Pass back the files required
+        to run the echelle method of wavecalib
+
+        Returns:
+            list: List of files
+        """
+        angle_fits_file = 'keck_hires_angle_fits.fits'
+        composite_arc_file = 'keck_hires_composite_arc.fits'
+
+        return [angle_fits_file, composite_arc_file]
 
 
     def get_rawimage(self, raw_file, det, spectrim=20):
@@ -795,7 +799,7 @@ class KeckHIRESOrigSpectrograph(KECKHIRESSpectrograph):
             specaxis        = 1,
             specflip        = False,
             spatflip        = False,
-            platescale      = 0.135,
+            platescale      = 0.2160,
             darkcurr        = 0.0,  # e-/pixel/hour
             saturation      = 65535.,
             nonlinear       = 0.7, # Website says 0.6, but we'll push it a bit
@@ -814,6 +818,19 @@ class KeckHIRESOrigSpectrograph(KECKHIRESSpectrograph):
             msgs.error("Bad CCDGAIN mode for HIRES")
             
         return detector_container.DetectorContainer(**detector_dict)
+
+
+    def get_echelle_angle_files(self):
+        """ Pass back the files required
+        to run the echelle method of wavecalib
+
+        Returns:
+            list: List of files
+        """
+        angle_fits_file = 'keck_hires_orig_angle_fits.fits'
+        composite_arc_file = 'keck_hires_orig_composite_arc.fits'
+
+        return [angle_fits_file, composite_arc_file]
 
 
 
